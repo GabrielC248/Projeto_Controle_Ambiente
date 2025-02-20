@@ -19,6 +19,19 @@
 #define I2C_SCL 15
 #define ADDRESS 0x3C
 
+// Definição da matriz WS2812
+#define LED_COUNT 25
+#define MATRIX_PIN 7
+struct pixel_t {
+  uint8_t G, R, B;
+};
+typedef struct pixel_t pixel_t;
+typedef pixel_t npLED_t;
+npLED_t leds[LED_COUNT];
+PIO np_pio;
+uint sm;
+
+
 // Configuração do PWM
 #define WRAP_VALUE 4095
 #define DIV_VALUE 1.0
@@ -40,6 +53,7 @@
 // Variáveis para as interrupções
 static volatile uint32_t last_time = 0;
 static volatile bool flag_b = false;
+static volatile bool switch_b = true;
 
 // Variáveis para o display
 static volatile uint8_t screen_state = 0;
@@ -124,8 +138,108 @@ void init_buzzers() {
     pwm_set_enabled(slice, true);
 }
 
-
 // ---------------- Inicializações - Fim ----------------
+
+// ---------------- WS2812 - Início ----------------
+
+// Inicializa a máquina PIO para controle da matriz de LEDs.
+void npInit(uint pin)
+{
+
+  // Cria programa PIO.
+  uint offset = pio_add_program(pio0, &ws2812_program);
+  np_pio = pio0;
+
+  // Toma posse de uma máquina PIO.
+  sm = pio_claim_unused_sm(np_pio, false);
+  if (sm < 0)
+  {
+    np_pio = pio1;
+    sm = pio_claim_unused_sm(np_pio, true); // Se nenhuma máquina estiver livre, panic!
+  }
+
+  // Inicia programa na máquina PIO obtida.
+  ws2812_program_init(np_pio, sm, offset, pin, 800000.f);
+
+  // Limpa buffer de pixels.
+  for (uint i = 0; i < LED_COUNT; ++i)
+  {
+    leds[i].R = 0;
+    leds[i].G = 0;
+    leds[i].B = 0;
+  }
+}
+
+// Atribui uma cor RGB a um LED.
+void npSetLED(const uint index, const uint8_t r, const uint8_t g, const uint8_t b)
+{
+  leds[index].R = r;
+  leds[index].G = g;
+  leds[index].B = b;
+}
+
+// Limpa o buffer de pixels.
+void npClear()
+{
+  for (uint i = 0; i < LED_COUNT; ++i)
+    npSetLED(i, 0, 0, 0);
+}
+
+// Escreve os dados do buffer nos LEDs.
+void npWrite()
+{
+  // Escreve cada dado de 8-bits dos pixels em sequência no buffer da máquina PIO.
+  for (uint i = 0; i < LED_COUNT; ++i)
+  {
+    pio_sm_put_blocking(np_pio, sm, leds[i].G);
+    pio_sm_put_blocking(np_pio, sm, leds[i].R);
+    pio_sm_put_blocking(np_pio, sm, leds[i].B);
+  }
+  sleep_us(100); // Espera 100us, sinal de RESET do datasheet.
+}
+
+// Função para facilitar o desenho no WS2812 utilizando 3 matrizes para o R, G e B.
+void npDraw(uint8_t vetorR[5][5], uint8_t vetorG[5][5], uint8_t vetorB[5][5])
+{
+  int i, j,idx,col;
+    for (i = 0; i < 5; i++) {
+        idx = (4 - i) * 5; // Calcula o índice base para a linha.
+        for (j = 0; j < 5; j++) {
+            col = (i % 2 == 0) ? (4 - j) : j; // Inverte a ordem das colunas nas linhas pares.
+            npSetLED(idx + col, vetorR[i][j], vetorG[i][j], vetorB[i][j]); // Preenche o buffer com os valores da matriz.
+        }
+    }
+}
+
+void humidifier_matrix() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorR[5][5] = {
+        {  1  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  1  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  1  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  1  }
+    };
+      uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+    uint8_t vetorB[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  1  ,  0  },
+        {  1  ,  1  ,  0  ,  1  ,  1  },
+        {  1  ,  1  ,  1  ,  0  ,  1  },
+        {  0  ,  1  ,  1  ,  1  ,  0  }
+    };
+    npDraw(vetorR,vetorG,vetorB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+  }
+
+// ---------------- WS2812 - Fim ----------------
 
 // Desenhos das caras no display
 void draw_happy(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
@@ -363,10 +477,15 @@ int main() {
 
     stdio_init_all();
     init_display(&ssd);
+    npInit(MATRIX_PIN);
+    npClear();
+    npWrite();
+
     init_joystick();
     init_rgb();
     init_buttons();
     init_buzzers();
+
 
     PIO pio = pio0;
     uint offset = pio_add_program(pio, &ws2812_program);
@@ -393,8 +512,16 @@ int main() {
         }
 
         if(flag_b) {
-            beep(400);
             flag_b = false;
+            if(switch_b) {
+                humidifier_matrix();
+                beep(400);
+                switch_b = false;
+            }else {
+                npClear();
+                npWrite();
+                switch_b = true;
+            }
         }
     }
 }

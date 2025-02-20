@@ -38,6 +38,7 @@
     "raspberry-pi-pico.ninjaPath": "${HOME}/.pico-sdk/ninja/v1.12.1/ninja",
     "files.associations": {
         "blink.pio.h": "c",
-        "clocks.h": "c"
+        "clocks.h": "c",
+        "cyw43_arch.h": "c"
     }
 }

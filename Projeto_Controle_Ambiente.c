@@ -29,6 +29,18 @@
 #define JSK_Y 26
 #define JSK_X 27
 
+// Configuração dos botões
+#define BUTTON_A 5
+#define BUTTON_B 6
+
+// Configuração dos buzzers
+#define BUZZER_A 21
+#define BUZZER_B 10
+
+// Variáveis para as interrupções
+static volatile uint32_t last_time = 0;
+static volatile bool flag_b = false;
+
 // Variáveis para o display
 static volatile uint8_t screen_state = 0;
 static volatile char string1[] = "T:000C*\0";;
@@ -86,6 +98,32 @@ void init_rgb() {
     pwm_set_gpio_level(RED_LED, 0);
     pwm_set_enabled(slice, true);
 }
+
+void init_buttons() {
+    gpio_init(BUTTON_A);
+    gpio_set_dir(BUTTON_A, GPIO_IN);
+    gpio_pull_up(BUTTON_A);
+    gpio_init(BUTTON_B);
+    gpio_set_dir(BUTTON_B, GPIO_IN);
+    gpio_pull_up(BUTTON_B);
+}
+
+void init_buzzers() {
+    uint slice;
+    gpio_set_function(BUZZER_A, GPIO_FUNC_PWM);
+    slice = pwm_gpio_to_slice_num(BUZZER_A);
+    pwm_set_clkdiv(BUZZER_A, 125);
+    pwm_set_wrap(BUZZER_A, 3822);
+    pwm_set_gpio_level(BUZZER_A, 0);
+    pwm_set_enabled(slice, true);
+    gpio_set_function(BUZZER_B, GPIO_FUNC_PWM);
+    slice = pwm_gpio_to_slice_num(BUZZER_B);
+    pwm_set_clkdiv(BUZZER_B, 125);
+    pwm_set_wrap(BUZZER_B, 2024);
+    pwm_set_gpio_level(BUZZER_B, 0);
+    pwm_set_enabled(slice, true);
+}
+
 
 // ---------------- Inicializações - Fim ----------------
 
@@ -209,6 +247,32 @@ int scale(int min1, int max1, int min2, int max2,int x1) {
     return ( (((x1-min1)*(max2-min2))/(max1-min1))+min2 );
 }
 
+void beep(uint tempo) {
+    pwm_set_gpio_level(BUZZER_A, 1911);
+    sleep_ms(tempo/4);
+    pwm_set_gpio_level(BUZZER_A, 0);
+    pwm_set_gpio_level(BUZZER_B, 1012);
+    sleep_ms(tempo/4);
+    pwm_set_gpio_level(BUZZER_B, 0);
+    pwm_set_gpio_level(BUZZER_A, 1911);
+    sleep_ms(tempo/4);
+    pwm_set_gpio_level(BUZZER_A, 0);
+    pwm_set_gpio_level(BUZZER_B, 1012);
+    sleep_ms(tempo/4);
+    pwm_set_gpio_level(BUZZER_B, 0);
+}
+
+void gpio_irq_callback(uint gpio, uint32_t events) {
+    uint32_t current_time = to_ms_since_boot(get_absolute_time());
+
+    if( (current_time - last_time) > 200 ) {
+        last_time = current_time;
+        if(gpio == BUTTON_B) {
+            flag_b = true;
+        }
+    }
+}
+
 void tela_inicial(ssd1306_t *ssd) {
     y_value = read_y();
     x_value = read_x();
@@ -301,9 +365,13 @@ int main() {
     init_display(&ssd);
     init_joystick();
     init_rgb();
+    init_buttons();
+    init_buzzers();
 
     PIO pio = pio0;
     uint offset = pio_add_program(pio, &ws2812_program);
+
+    gpio_set_irq_enabled_with_callback(BUTTON_B, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_callback);
 
     while (true) {
         sleep_ms(10);
@@ -322,6 +390,11 @@ int main() {
                 break;
             default:
                 screen_state = 0;
+        }
+
+        if(flag_b) {
+            beep(400);
+            flag_b = false;
         }
     }
 }

@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = 'build\Projeto_Controle_Ambiente.hex'
+elf = 'build\Projeto_Controle_Ambiente.uf2'

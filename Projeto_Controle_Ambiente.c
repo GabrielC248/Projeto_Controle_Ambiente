@@ -48,6 +48,7 @@ uint sm;    // State machine para controle dos LEDs
 #define WRAP_VALUE 4095 // Valor do WRAP
 #define DIV_VALUE 1.0   // Valor do divisor de clock
 #define RED_LED 13      // Pino do LED vermelho
+#define BLUE_LED 12     // Pino do LED azul
 
 // Configuração do joystick
 #define JSK_SEL 22 // Pino do botão do joystick
@@ -90,8 +91,8 @@ static volatile bool face_fan = false;        // Flag do ventilador para control
 static volatile bool change_screen = false;   // Flag para indicar se o desenho na matriz de LEDs deve ser alterada
 
 // Variáveis para o joystick
-static volatile uint16_t y_high=4095, y_low=0, y_middle_high=2047, y_middle_low=2047; // Limites do eixo Y
-static volatile uint16_t x_high=4095, x_low=0, x_middle_high=2047, x_middle_low=2047; // Limites do eixo X
+static volatile uint16_t y_high=4095, y_low=0, y_middle_high=2047, y_middle_low=2047; // Limites do eixo Y (Calibração)
+static volatile uint16_t x_high=4095, x_low=0, x_middle_high=2047, x_middle_low=2047; // Limites do eixo X (Calibração)
 static volatile uint16_t x_value=2047, y_value=2047; // Valores capturados pelo joystick
 static volatile int x_scaled = 0, y_scaled = 0;      // Valores do joystick convertidos para valores de temperatura e umidade
 
@@ -129,12 +130,19 @@ void init_display(ssd1306_t *ssd) {
 void init_rgb() {
     uint slice;
 
-    // Configura o pino do vermelho como saída PWM
+    // Configura o pino do LED vermelho como saída PWM
     gpio_set_function(RED_LED, GPIO_FUNC_PWM);
     slice = pwm_gpio_to_slice_num(RED_LED);
     pwm_set_clkdiv(slice, DIV_VALUE);
     pwm_set_wrap(slice, WRAP_VALUE);
     pwm_set_gpio_level(RED_LED, 0);
+    pwm_set_enabled(slice, true);
+    // Configura o pino do LED azul como saída PWM
+    gpio_set_function(BLUE_LED, GPIO_FUNC_PWM);
+    slice = pwm_gpio_to_slice_num(BLUE_LED);
+    pwm_set_clkdiv(slice, DIV_VALUE);
+    pwm_set_wrap(slice, WRAP_VALUE);
+    pwm_set_gpio_level(BLUE_LED, 0);
     pwm_set_enabled(slice, true);
 }
 
@@ -581,31 +589,36 @@ void meio() {
 
 // -------- Joystick - Início --------
 
-// Leitura do joystick
+// Leitura do eixo y do joystick
 uint16_t read_y() {
     adc_select_input(0);
     return adc_read();
 }
 
+// Leitura do eixo x do joystick
 uint16_t read_x() {
     adc_select_input(1);
     return adc_read();
 }
 
+// Leitura para converter escalas (Transformar os valores do joystick em valores de temperatura e umidade)
 int scale(int min1, int max1, int min2, int max2,int x1) {
     return ( (((x1-min1)*(max2-min2))/(max1-min1))+min2 );
 }
 
+// Função para calibrar o eixo y do joystick
 void calibrate_jsk_y_values() {
     uint16_t value, temp;
     int i;
     adc_select_input(0);
 
+    // Indica ao usuário através da matriz de LEDs para colocar o joystick para cima e espera 2 segundos
     seta_cima();
     sleep_ms(2000);
 
+    // Lê repetidamente o valor do eixo y e guarda o menor valor registrado no topo
     value = 4095;
-    for(i=0;i<500;i++) {
+    for(i=0;i<300;i++) {
         temp = adc_read();
         if(temp < value) {
             value = temp;
@@ -614,11 +627,13 @@ void calibrate_jsk_y_values() {
     }
     y_high = value;
 
+    // Indica ao usuário através da matriz de LEDs para colocar o joystick para o meio e espera 2 segundos
     meio();
     sleep_ms(2000);
 
+    // Lê repetidamente o valor do eixo y e guarda o maior valor registrado no meio
     value = 0;
-    for(i=0;i<500;i++) {
+    for(i=0;i<300;i++) {
         temp = adc_read();
         if(temp > value) {
             value = temp;
@@ -627,11 +642,13 @@ void calibrate_jsk_y_values() {
     }
     y_middle_high = value;
 
+    // Indica ao usuário através da matriz de LEDs para colocar o joystick para baixo e espera 2 segundos
     seta_baixo();
     sleep_ms(2000);
 
+    // Lê repetidamente o valor do eixo y e guarda o maior valor registrado na base
     value = 0;
-    for(i=0;i<500;i++) {
+    for(i=0;i<300;i++) {
         temp = adc_read();
         if(temp > value) {
             value = temp;
@@ -640,11 +657,13 @@ void calibrate_jsk_y_values() {
     }
     y_low = value;
 
+    // Indica ao usuário através da matriz de LEDs para colocar o joystick para o meio e espera 2 segundos
     meio();
     sleep_ms(2000);
 
+    // Lê repetidamente o valor do eixo y e guarda o menor valor registrado no meio
     value = 4095;
-    for(i=0;i<500;i++) {
+    for(i=0;i<300;i++) {
         temp = adc_read();
         if(temp < value) {
             value = temp;
@@ -654,16 +673,19 @@ void calibrate_jsk_y_values() {
     y_middle_low = value;
 }
 
+// Função para calibrar o eixo x do joystick
 void calibrate_jsk_x_values() {
     uint16_t value, temp;
     int i;
     adc_select_input(1);
 
+    // Indica ao usuário através da matriz de LEDs para colocar o joystick para a direita e espera 2 segundos
     seta_direita();
     sleep_ms(2000);
 
+    // Lê repetidamente o valor do eixo x e guarda o menor valor registrado na direita
     value = 4095;
-    for(i=0;i<500;i++) {
+    for(i=0;i<300;i++) {
         temp = adc_read();
         if(temp < value) {
             value = temp;
@@ -672,11 +694,13 @@ void calibrate_jsk_x_values() {
     }
     x_high = value;
 
+    // Indica ao usuário através da matriz de LEDs para colocar o joystick para o meio e espera 2 segundos
     meio();
     sleep_ms(2000);
 
+    // Lê repetidamente o valor do eixo x e guarda o maior valor registrado no meio
     value = 0;
-    for(i=0;i<500;i++) {
+    for(i=0;i<300;i++) {
         temp = adc_read();
         if(temp > value) {
             value = temp;
@@ -685,11 +709,13 @@ void calibrate_jsk_x_values() {
     }
     x_middle_high = value;
 
+    // Indica ao usuário através da matriz de LEDs para colocar o joystick para a esquerda e espera 2 segundos
     seta_esquerda();
     sleep_ms(2000);
 
+    // Lê repetidamente o valor do eixo x e guarda o maior valor registrado na esquerda
     value = 0;
-    for(i=0;i<500;i++) {
+    for(i=0;i<300;i++) {
         temp = adc_read();
         if(temp > value) {
             value = temp;
@@ -698,11 +724,13 @@ void calibrate_jsk_x_values() {
     }
     x_low = value;
 
+    // Indica ao usuário através da matriz de LEDs para colocar o joystick para o meio e espera 2 segundos
     meio();
     sleep_ms(2000);
 
+    // Lê repetidamente o valor do eixo x e guarda o menor valor registrado no meio
     value = 4095;
-    for(i=0;i<500;i++) {
+    for(i=0;i<300;i++) {
         temp = adc_read();
         if(temp < value) {
             value = temp;
@@ -716,18 +744,28 @@ void calibrate_jsk_x_values() {
 
 // -------- Buzzers - Início --------
 
+// Emite um som alternando entre dois buzzers por um tempo determinado
 void beep(uint tempo) {
+    // Ativa o BUZZER A
     pwm_set_gpio_level(BUZZER_A, 1911);
     sleep_ms(tempo/4);
+
+    // Desativa o BUZZER A e ativa o BUZZER B
     pwm_set_gpio_level(BUZZER_A, 0);
     pwm_set_gpio_level(BUZZER_B, 1012);
     sleep_ms(tempo/4);
+
+    // Ativa o BUZZER A e desativa o BUZZER B
     pwm_set_gpio_level(BUZZER_B, 0);
     pwm_set_gpio_level(BUZZER_A, 1911);
     sleep_ms(tempo/4);
+
+    // Desativa o BUZZER A e ativa o BUZZER B
     pwm_set_gpio_level(BUZZER_A, 0);
     pwm_set_gpio_level(BUZZER_B, 1012);
     sleep_ms(tempo/4);
+
+    // Desativa o BUZZER B
     pwm_set_gpio_level(BUZZER_B, 0);
 }
 
@@ -735,25 +773,26 @@ void beep(uint tempo) {
 
 // -------- Callback - Início --------
 
+// Callback para tratar as interrupções do botão do joystick e do botão B
 void gpio_irq_callback(uint gpio, uint32_t events) {
-    uint32_t current_time = to_ms_since_boot(get_absolute_time());
+    uint32_t current_time = to_ms_since_boot(get_absolute_time()); // Obtém o tempo atual em ms
 
+    // Debounce de 200 ms
     if( (current_time - last_time) > 200 ) {
         last_time = current_time;
-        if(gpio == JSK_SEL) {
+
+        if(gpio == JSK_SEL) { // Verifica se foi o botão do joystick
             if(screen_state < 4) {
-                screen_state++;
+                screen_state++;   // Avança para a próxima tela
             }else {
-                screen_state = 0;
+                screen_state = 0; // Retorna à primeira tela
             }
             change_screen = true;
         }else
-        if(gpio == BUTTON_A) {
-
-        }else
-        if(gpio == BUTTON_B) {
-            flag_b = true;
+        if(gpio == BUTTON_B) { // Verifica se foi o botão B
+            flag_b = true; // Simula o "sinal" do sensor de nível do umidificador, indicando que mudou
         }
+
     }
 }
 
@@ -785,30 +824,32 @@ void tela_inicial(ssd1306_t *ssd) {
 
     if(y_scaled < fan_low) {
         sprintf((char *)&string3[4],"off   \0");
-        pwm_set_gpio_level(RED_LED,0);
+        pwm_set_gpio_level(RED_LED, 0);
         face_fan = true;
     }else
     if(y_scaled < fan_medium) {
         sprintf((char *)&string3[4],"low   \0");
-        pwm_set_gpio_level(RED_LED,1365);
+        pwm_set_gpio_level(RED_LED, 1365);
         face_fan = true;
     }else
     if(y_scaled < fan_high) {
         sprintf((char *)&string3[4],"medium\0");
-        pwm_set_gpio_level(RED_LED,2730);
+        pwm_set_gpio_level(RED_LED, 2730);
         face_fan = true;
     }else {
         sprintf((char *)&string3[4],"high  \0");
-        pwm_set_gpio_level(RED_LED,4095);
+        pwm_set_gpio_level(RED_LED, 4095);
         face_fan = false;
     }
 
     if(x_scaled > humidifier_on) {
-        sprintf((char *)&string4[12],"ff\0");
+        sprintf((char *)&string4[11],"off\0");
         face_humidifier = true;
+        pwm_set_gpio_level(BLUE_LED, 0);
     }else {
-        sprintf((char *)&string4[12],"n \0");
+        sprintf((char *)&string4[11],"on \0");
         face_humidifier = false;
+        pwm_set_gpio_level(BLUE_LED, 1365);
     }
 
     if(face_fan && face_humidifier) {
@@ -846,20 +887,32 @@ void selecionar_temperatura(ssd1306_t *ssd) {
     if(y_scaled < -15) {
         y_scaled = -15;
     }
-    
+
+    sprintf((char *)&string2[2],"    \0");
+    sprintf((char *)&string4[11],"   \0");
+    ssd1306_draw_string(ssd,(char *)string2,6,20);
+    ssd1306_draw_string(ssd,(char *)string4,6,50);
+    pwm_set_gpio_level(BLUE_LED, 0);
+
     sprintf((char *)&string1[2],"%3dC*\0",y_scaled);
 
     ssd1306_draw_string(ssd,(char *)string1,6,7);
 
     switch(contador) {
         case 0:
+            pwm_set_gpio_level(RED_LED, 1365);
             sprintf((char *)&string3[4],"low   \0");
+            draw_happy(ssd,84,6);
             break;
         case 1:
+            pwm_set_gpio_level(RED_LED, 2730);
             sprintf((char *)&string3[4],"medium\0");
+            draw_happy(ssd,84,6);
             break;
         case 2:
+            pwm_set_gpio_level(RED_LED, 4095);
             sprintf((char *)&string3[4],"high  \0");
+            draw_sad(ssd,84,6);
             break;
         default:
             contador = 0;
@@ -907,11 +960,18 @@ void selecionar_umidade(ssd1306_t *ssd) {
         x_scaled = 0;
     }
     
+    sprintf((char *)&string1[2],"     \0");
+    sprintf((char *)&string3[4],"      \0");
+    ssd1306_draw_string(ssd,(char *)string1,6,7);
+    ssd1306_draw_string(ssd,(char *)string3,6,37);
+    pwm_set_gpio_level(RED_LED, 0);
+    
     sprintf((char *)&string2[2],"%3d%%\0",x_scaled);
-
     ssd1306_draw_string(ssd,(char *)string2,6,20);
 
-    sprintf((char *)&string4[12],"n \0");
+    pwm_set_gpio_level(BLUE_LED, 1365);
+    sprintf((char *)&string4[11],"on \0");
+    draw_sad(ssd,84,6);
     ssd1306_draw_string(ssd,(char *)string4,6,50);
     
     ssd1306_send_data(ssd);
@@ -930,11 +990,13 @@ void calibrar_joystick() {
     if( (t_current_time - t_last_time) > 200 ) {
         if(!gpio_get(BUTTON_A)) {
             t_last_time = t_current_time;
+            gpio_set_irq_enabled(JSK_SEL, GPIO_IRQ_EDGE_FALL, false);
             beep(120);
             calibrate_jsk_y_values();
             calibrate_jsk_x_values();
             beep(120);
             calibration_screen();
+            gpio_set_irq_enabled(JSK_SEL, GPIO_IRQ_EDGE_FALL, true);
         }
     }
 }
@@ -1000,16 +1062,23 @@ int main() {
             change_screen = false;
             switch(screen_state) {
                 case 0:
+                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, true);
                     npClear();
                     npWrite();
                     break;
                 case 1:
+                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, false);
                     temperature_screen();
                     break;
                 case 2:
+                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, false);
                     humidifier_screen();
                     break;
                 case 3:
+                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, false);
+                    pwm_set_gpio_level(BLUE_LED, 0);
+                    pwm_set_gpio_level(RED_LED, 0);
+                    tela_inicial(&ssd);
                     calibration_screen();
                     break;
             }

@@ -1,11 +1,13 @@
 // ---------------- Bibliotecas - Início ----------------
 
+// Biblioteca padrão de entrada e saída do C (Foi usada para debugging)
 #include <stdio.h>
-#include <string.h>
 
+// Bibliotecas do pico SDK de mais alto nível
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 
+// Bibliotecas do pico SDK de hardware
 #include "hardware/i2c.h"
 #include "hardware/pio.h"
 #include "hardware/adc.h"
@@ -13,9 +15,10 @@
 #include "hardware/timer.h"
 #include "hardware/clocks.h"
 
-#include "inc/ssd1306.h"
-#include "inc/font.h"
-#include "ws2812.pio.h"
+#include "inc/ssd1306.h" // Header para controle do display OLED
+#include "inc/font.h"    // Header com as fontes para o display
+
+#include "ws2812.pio.h"  // Header para controle dos LEDs WS2812
 
 // ---------------- Bibliotecas - Fim ----------------
 
@@ -23,41 +26,41 @@
 
 // ---------------- Definições - Início ----------------
 
-// Configuração do display
-#define I2C_PORT i2c1
-#define I2C_SDA 14
-#define I2C_SCL 15
-#define ADDRESS 0x3C
+// Configurações do I2C para comunicação com o display OLED
+#define I2C_PORT i2c1 // Porta I2C
+#define I2C_SDA 14    // Pino de dados
+#define I2C_SCL 15    // Pino de clock
+#define ADDRESS 0x3C  // Endereço do display
 
-// Definição da matriz WS2812
-#define LED_COUNT 25
-#define MATRIX_PIN 7
-struct pixel_t {
-  uint8_t G, R, B;
+// Definições da matriz de LEDs
+#define LED_COUNT 25  // Número total de LEDs na matriz
+#define MATRIX_PIN 7  // Pino da matriz de LEDs
+struct pixel_t {   // Estrutura para armazenar as cores de um LED WS2812
+  uint8_t G, R, B; // Componentes de cor (verde, vermelho e azul)
 };
 typedef struct pixel_t pixel_t;
 typedef pixel_t npLED_t;
 npLED_t leds[LED_COUNT];
-PIO np_pio;
-uint sm;
+PIO np_pio; // Instância do PIO
+uint sm;    // State machine para controle dos LEDs
 
-// Configuração do PWM
-#define WRAP_VALUE 4095
-#define DIV_VALUE 1.0
-#define RED_LED 13
+//  Configurações do PWM para os LEDs
+#define WRAP_VALUE 4095 // Valor do WRAP
+#define DIV_VALUE 1.0   // Valor do divisor de clock
+#define RED_LED 13      // Pino do LED vermelho
 
 // Configuração do joystick
-#define JSK_SEL 22
-#define JSK_Y 26
-#define JSK_X 27
+#define JSK_SEL 22 // Pino do botão do joystick
+#define JSK_Y 26   // Pino do eixo Y do joystick
+#define JSK_X 27   // Pino do eixo X do joystick
 
 // Configuração dos botões
-#define BUTTON_A 5
-#define BUTTON_B 6
+#define BUTTON_A 5 // Pino do botão A
+#define BUTTON_B 6 // Pino do botão B
 
 // Configuração dos buzzers
-#define BUZZER_A 21
-#define BUZZER_B 10
+#define BUZZER_A 21 // Pino do buzzer A
+#define BUZZER_B 10 // Pino do buzzer B
 
 // ---------------- Definições - Fim ----------------
 
@@ -65,34 +68,36 @@ uint sm;
 
 // ---------------- Variáveis - Início ----------------
 
-// Variáveis para as interrupções
-static volatile uint32_t last_time = 0;
-static volatile bool flag_b = false;
-static volatile bool switch_b = true;
+// Variáveis para controle de interrupções
+static volatile uint32_t last_time = 0; // Armazena o último tempo registrado nas interrupções dos botões
+static volatile bool flag_b = false;    // Flag de controle para o botão B
+static volatile bool switch_b = true;   // Estado do botão B (Representa o sinal que está sendo recebido do sensor de nível do umidificador)
 
 // Variáveis para o display
-static volatile uint8_t screen_state = 0;
-static volatile char string1[] = "T:000C*\0";;
-static volatile char string2[] = "U:000%\0";
-static volatile char string3[] = "fan:medium\0";
-static volatile char string4[] = "humidifier:off\0";
+static volatile uint8_t screen_state = 0;            // Estado atual da tela
+static volatile char string1[] = "T:000C*\0";;       // String da temperatura
+static volatile char string2[] = "U:000%\0";         // String da umidade
+static volatile char string3[] = "fan:medium\0";     // String do ventilador
+static volatile char string4[] = "humidifier:off\0"; // String do umidificador
 
 // Variáveis de controle do display
-static volatile int fan_low = 26, fan_medium = 30,fan_high = 34;
-static volatile int humidifier_on = 60;
-static volatile bool face_humidifier = false;
-static volatile bool face_fan = false;
-static volatile bool change_screen = false;
+static volatile int fan_low = 26;             // Limite para ativar a velocidade mínima do ventilador
+static volatile int fan_medium = 30;          // Limite para ativar a velocidade média do ventilador
+static volatile int fan_high = 34;            // Limite para ativar a velocidade máxima do ventilador
+static volatile int humidifier_on = 60;       // Limite para ativação do umidificador
+static volatile bool face_humidifier = false; // Flag do umidificador para controlar qual rosto deve aparecer no display
+static volatile bool face_fan = false;        // Flag do ventilador para controlar qual rosto deve aparecer no display
+static volatile bool change_screen = false;   // Flag para indicar se o desenho na matriz de LEDs deve ser alterada
 
 // Variáveis para o joystick
-static volatile uint16_t x_high=4095, x_low=0, x_middle_high=2047, x_middle_low=2047;
-static volatile uint16_t y_high=4095, y_low=0, y_middle_high=2047, y_middle_low=2047;
-static volatile uint16_t x_value=2047, y_value=2047;
-static volatile int x_scaled = 0, y_scaled = 0;
+static volatile uint16_t y_high=4095, y_low=0, y_middle_high=2047, y_middle_low=2047; // Limites do eixo Y
+static volatile uint16_t x_high=4095, x_low=0, x_middle_high=2047, x_middle_low=2047; // Limites do eixo X
+static volatile uint16_t x_value=2047, y_value=2047; // Valores capturados pelo joystick
+static volatile int x_scaled = 0, y_scaled = 0;      // Valores do joystick convertidos para valores de temperatura e umidade
 
-// Variáveis para a seleção de temperatura
-static volatile uint32_t t_last_time = 0;
-static volatile uint8_t contador = 0;
+// Variáveis de contrle para as telas
+static volatile uint32_t t_last_time = 0; // Último tempo registrado para debouncing
+static volatile uint8_t contador = 0;     // Contador para alterar os limites de velocidade do ventilador
 
 // ---------------- Variáveis - Fim ----------------
 
@@ -100,25 +105,31 @@ static volatile uint8_t contador = 0;
 
 // ---------------- Inicializações - Início ----------------
 
+// Inicializa o display OLED via I2C
 void init_display(ssd1306_t *ssd) {
-    i2c_init(I2C_PORT, 400 * 1000);
+    i2c_init(I2C_PORT, 400 * 1000); // Inicializa o I2C com frequência de 400 kHz
 
+    // Configura os pinos SDA e SCL como I2C e habilita pull-ups
     gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
     gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(I2C_SDA);
     gpio_pull_up(I2C_SCL);
 
+    // Inicializa e configura o display
     ssd1306_init(ssd, WIDTH, HEIGHT, false, ADDRESS, I2C_PORT);
     ssd1306_config(ssd);
     ssd1306_send_data(ssd);
     
+    // Limpa o display
     ssd1306_fill(ssd, false);
     ssd1306_send_data(ssd);
 }
 
+// Inicializa o LED RGB com PWM
 void init_rgb() {
     uint slice;
 
+    // Configura o pino do vermelho como saída PWM
     gpio_set_function(RED_LED, GPIO_FUNC_PWM);
     slice = pwm_gpio_to_slice_num(RED_LED);
     pwm_set_clkdiv(slice, DIV_VALUE);
@@ -127,14 +138,19 @@ void init_rgb() {
     pwm_set_enabled(slice, true);
 }
 
+// Inicializa os buzzers com PWM
 void init_buzzers() {
     uint slice;
+
+    // Configuração do Buzzer A
     gpio_set_function(BUZZER_A, GPIO_FUNC_PWM);
     slice = pwm_gpio_to_slice_num(BUZZER_A);
     pwm_set_clkdiv(BUZZER_A, 125);
     pwm_set_wrap(BUZZER_A, 3822);
     pwm_set_gpio_level(BUZZER_A, 0);
     pwm_set_enabled(slice, true);
+
+    // Configuração do Buzzer B
     gpio_set_function(BUZZER_B, GPIO_FUNC_PWM);
     slice = pwm_gpio_to_slice_num(BUZZER_B);
     pwm_set_clkdiv(BUZZER_B, 125);
@@ -143,16 +159,21 @@ void init_buzzers() {
     pwm_set_enabled(slice, true);
 }
 
+// Inicializa o joystick
 void init_joystick() {
+
+    // Inicializa o botão do joystick
     gpio_init(JSK_SEL);
     gpio_set_dir(JSK_SEL, GPIO_IN);
     gpio_pull_up(JSK_SEL);
 
+    // Inicializa o ADC do eixo Y e X e joystick
     adc_init();
-    adc_gpio_init(JSK_X);
     adc_gpio_init(JSK_Y);
+    adc_gpio_init(JSK_X);
 }
 
+// Inicializa os botões A e B
 void init_buttons() {
     gpio_init(BUTTON_A);
     gpio_set_dir(BUTTON_A, GPIO_IN);
@@ -164,71 +185,64 @@ void init_buttons() {
 
 // -------- Matriz - Início --------
 
-// Inicializa a máquina PIO para controle da matriz de LEDs.
-void npInit(uint pin)
-{
+// Inicializa a máquina PIO para controle da matriz de LEDs
+void npInit(uint pin) {
 
-  // Cria programa PIO.
-  uint offset = pio_add_program(pio0, &ws2812_program);
-  np_pio = pio0;
+    // Carrega o programa PIO para controle dos LEDs
+    uint offset = pio_add_program(pio0, &ws2812_program);
+    np_pio = pio0;
 
-  // Toma posse de uma máquina PIO.
-  sm = pio_claim_unused_sm(np_pio, false);
-  if (sm < 0)
-  {
-    np_pio = pio1;
-    sm = pio_claim_unused_sm(np_pio, true); // Se nenhuma máquina estiver livre, panic!
-  }
+    // Obtém uma máquina de estado PIO disponível
+    sm = pio_claim_unused_sm(np_pio, false);
+    if (sm < 0) {
+        np_pio = pio1;
+        sm = pio_claim_unused_sm(np_pio, true);
+    }
 
-  // Inicia programa na máquina PIO obtida.
-  ws2812_program_init(np_pio, sm, offset, pin, 800000.f);
+    // Inicializa a máquina de estado com o WS2812.pio
+    ws2812_program_init(np_pio, sm, offset, pin, 800000.f);
 
-  // Limpa buffer de pixels.
-  for (uint i = 0; i < LED_COUNT; ++i)
-  {
-    leds[i].R = 0;
-    leds[i].G = 0;
-    leds[i].B = 0;
-  }
+    // Limpa o buffer de pixels
+    for (uint i = 0; i < LED_COUNT; ++i) {
+        leds[i].R = 0;
+        leds[i].G = 0;
+        leds[i].B = 0;
+    }
 }
 
-// Atribui uma cor RGB a um LED.
-void npSetLED(const uint index, const uint8_t r, const uint8_t g, const uint8_t b)
-{
-  leds[index].R = r;
-  leds[index].G = g;
-  leds[index].B = b;
+// Atribui uma cor RGB a um LED específico na matriz
+void npSetLED(const uint index, const uint8_t r, const uint8_t g, const uint8_t b) {
+    leds[index].R = r;
+    leds[index].G = g;
+    leds[index].B = b;
 }
 
-// Limpa o buffer de pixels.
-void npClear()
-{
-  for (uint i = 0; i < LED_COUNT; ++i)
-    npSetLED(i, 0, 0, 0);
+// Limpa todos os LEDs na matriz
+void npClear() {
+    for (uint i = 0; i < LED_COUNT; ++i) {
+        npSetLED(i, 0, 0, 0);
+    }
 }
 
-// Escreve os dados do buffer nos LEDs.
-void npWrite()
-{
-  // Escreve cada dado de 8-bits dos pixels em sequência no buffer da máquina PIO.
-  for (uint i = 0; i < LED_COUNT; ++i)
-  {
-    pio_sm_put_blocking(np_pio, sm, leds[i].G);
-    pio_sm_put_blocking(np_pio, sm, leds[i].R);
-    pio_sm_put_blocking(np_pio, sm, leds[i].B);
-  }
-  sleep_us(100); // Espera 100us, sinal de RESET do datasheet.
+// Escreve os dados do buffer para os LEDs
+void npWrite() {
+    // Escreve cada dado de 8 bits dos pixels em sequência no buffer da máquina PIO
+    for (uint i = 0; i < LED_COUNT; ++i) {
+        pio_sm_put_blocking(np_pio, sm, leds[i].G);
+        pio_sm_put_blocking(np_pio, sm, leds[i].R);
+        pio_sm_put_blocking(np_pio, sm, leds[i].B);
+    }
+    sleep_us(100); // Espera 100us para o reset
 }
 
-// Função para facilitar o desenho no WS2812 utilizando 3 matrizes para o R, G e B.
-void npDraw(uint8_t vetorR[5][5], uint8_t vetorG[5][5], uint8_t vetorB[5][5])
-{
+// Função para facilitar o desenho na matriz utilizando 3 matrizes cos os valores RGB
+void npDraw(uint8_t vetorR[5][5], uint8_t vetorG[5][5], uint8_t vetorB[5][5]) {
   int i, j,idx,col;
     for (i = 0; i < 5; i++) {
-        idx = (4 - i) * 5; // Calcula o índice base para a linha.
+        idx = (4 - i) * 5; // Calcula o índice base para a linha
         for (j = 0; j < 5; j++) {
-            col = (i % 2 == 0) ? (4 - j) : j; // Inverte a ordem das colunas nas linhas pares.
-            npSetLED(idx + col, vetorR[i][j], vetorG[i][j], vetorB[i][j]); // Preenche o buffer com os valores da matriz.
+            col = (i % 2 == 0) ? (4 - j) : j; // Inverte a ordem das colunas nas linhas pares
+            npSetLED(idx + col, vetorR[i][j], vetorG[i][j], vetorB[i][j]); // Preenche o buffer com os valores das matrizes
         }
     }
 }
@@ -243,12 +257,11 @@ void npDraw(uint8_t vetorR[5][5], uint8_t vetorG[5][5], uint8_t vetorB[5][5])
 
 // -------- Display - Início --------
 
-// Desenhos das caras no display
+// Função para desenhar uma cara feliz no display
 void draw_happy(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
     uint8_t max_y = y0+22;
     uint8_t max_x = x0+22;
-    uint8_t face[22][22] = {
-
+    uint8_t face[22][22] = { // Matriz que representa a cara feliz (1 = pixel aceso, 0 = pixel apagado)
         {0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0},
         {0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0},
         {0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,1,1,0,0,0,0},
@@ -272,19 +285,18 @@ void draw_happy(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
         {0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0},
         {0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0}
     };
-
-    for (uint8_t y = y0; y < max_y; y++) {
+    for (uint8_t y = y0; y < max_y; y++) { // Percorre a matriz e desenha os pixels correspondentes no display
         for (uint8_t x = x0; x < max_x; x++) {
             ssd1306_pixel(ssd, x, y, face[y-y0][x-x0]);
         }
     }
 }
 
+// Função para desenhar uma cara neutra no display
 void draw_neutral(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
     uint8_t max_y = y0+22;
     uint8_t max_x = x0+22;
-    uint8_t face[22][22] = {
-
+    uint8_t face[22][22] = { // Matriz que representa a cara neutra (1 = pixel aceso, 0 = pixel apagado)
         {0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0},
         {0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0},
         {0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,1,1,0,0,0,0},
@@ -308,19 +320,18 @@ void draw_neutral(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
         {0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0},
         {0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0}
     };
-
-    for (uint8_t y = y0; y < max_y; y++) {
+    for (uint8_t y = y0; y < max_y; y++) { // Percorre a matriz e desenha os pixels correspondentes no display
         for (uint8_t x = x0; x < max_x; x++) {
             ssd1306_pixel(ssd, x, y, face[y-y0][x-x0]);
         }
     }
 }
 
+// Função para desenhar uma cara triste no display
 void draw_sad(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
     uint8_t max_y = y0+22;
     uint8_t max_x = x0+22;
-    uint8_t face[22][22] = {
-
+    uint8_t face[22][22] = { // Matriz que representa a face triste (1 = pixel aceso, 0 = pixel apagado)
         {0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0},
         {0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0},
         {0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,1,1,0,0,0,0},
@@ -344,8 +355,7 @@ void draw_sad(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
         {0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0},
         {0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0}
     };
-
-    for (uint8_t y = y0; y < max_y; y++) {
+    for (uint8_t y = y0; y < max_y; y++) { // Percorre a matriz e desenha os pixels correspondentes no display
         for (uint8_t x = x0; x < max_x; x++) {
             ssd1306_pixel(ssd, x, y, face[y-y0][x-x0]);
         }
@@ -356,8 +366,9 @@ void draw_sad(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
 
 // -------- Matriz - Início --------
 
+// Função para exibir na matriz de LEDs o símbolo indicando que a água do umidificador está acabando
 void humidifier_matrix() {
-    // Vetor que representa os LEDs azuis
+    // Matrizes que representam os LEDs vermelhos, verdes e azuis
     uint8_t vetorR[5][5] = {
         {  1  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  1  ,  0  ,  0  ,  0  },
@@ -379,13 +390,14 @@ void humidifier_matrix() {
         {  1  ,  1  ,  1  ,  0  ,  1  },
         {  0  ,  1  ,  1  ,  1  ,  0  }
     };
-    npDraw(vetorR,vetorG,vetorB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+    npDraw(vetorR,vetorG,vetorB); // Carrega os buffers
+    npWrite();                    // Escreve na matriz de LEDs
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia)
 }
 
+// Função para exibir o símbolo indicando a tela de mudança de temperaturas do ventilador na matriz de LEDs
 void temperature_screen() {
-    // Vetor que representa os LEDs azuis
+    // Matrizes que representam os LEDs vermelhos, verdes e azuis
     uint8_t vetorR[5][5] = {
         {  1  ,  1  ,  1  ,  1  ,  1  },
         {  1  ,  0  ,  1  ,  0  ,  1  },
@@ -400,13 +412,14 @@ void temperature_screen() {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  }
     };
-    npDraw(vetorR,vetorGB,vetorGB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+    npDraw(vetorR,vetorGB,vetorGB); // Carrega os buffers
+    npWrite();                      // Escreve na matriz de LEDs
+    npClear();                      // Limpa os buffers (não necessário, mas por garantia)
 }
 
+// Função para exibir o símbolo indicando a tela de mudança de umidade mínima do umidificador na matriz de LEDs
 void humidifier_screen() {
-    // Vetor que representa os LEDs azuis
+    // Matrizes que representam os LEDs vermelhos, verdes e azuis
     uint8_t vetorRG[5][5] = {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  },
@@ -421,14 +434,14 @@ void humidifier_screen() {
         {  1  ,  0  ,  0  ,  0  ,  1  },
         {  1  ,  1  ,  1  ,  1  ,  1  }
     };
-
-    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers
+    npWrite();                      // Escreve na matriz de LEDs
+    npClear();                      // Limpa os buffers (não necessário, mas por garantia)
 }
 
+// Função para exibir o símbolo indicando a tela de calibração do joystick ("sensores") na matriz de LEDs
 void calibration_screen() {
-    // Vetor que representa os LEDs azuis
+    // Matrizes que representam os LEDs vermelhos, verdes e azuis
     uint8_t vetorB[5][5] = {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  },
@@ -443,14 +456,14 @@ void calibration_screen() {
         {  0  ,  1  ,  1  ,  1  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  }
     };
-
-    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers
+    npWrite();                      // Escreve na matriz de LEDs
+    npClear();                      // Limpa os buffers (não necessário, mas por garantia)
 }
 
+// Função para exibir o símbolo de seta para cima na matriz de LEDs para a calibração
 void seta_cima() {
-    // Vetor que representa os LEDs azuis
+    // Matrizes que representam os LEDs vermelhos, verdes e azuis
     uint8_t vetorG[5][5] = {
         {  0  ,  0  ,  1  ,  0  ,  0  },
         {  0  ,  1  ,  1  ,  1  ,  0  },
@@ -465,14 +478,14 @@ void seta_cima() {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  }
     };
-
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers
+    npWrite();                      // Escreve na matriz de LEDs
+    npClear();                      // Limpa os buffers (não necessário, mas por garantia)
 }
 
+// Função para exibir o símbolo de seta para baixo na matriz de LEDs para a calibração
 void seta_baixo() {
-    // Vetor que representa os LEDs azuis
+    // Matrizes que representam os LEDs vermelhos, verdes e azuis
     uint8_t vetorG[5][5] = {
         {  0  ,  0  ,  1  ,  0  ,  0  },
         {  0  ,  0  ,  1  ,  0  ,  0  },
@@ -487,14 +500,14 @@ void seta_baixo() {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  }
     };
-
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers
+    npWrite();                      // Escreve na matriz de LEDs
+    npClear();                      // Limpa os buffers (não necessário, mas por garantia)
 }
 
+// Função para exibir o símbolo de seta para a esquerda na matriz de LEDs para a calibração
 void seta_esquerda() {
-    // Vetor que representa os LEDs azuis
+    // Matrizes que representam os LEDs vermelhos, verdes e azuis
     uint8_t vetorG[5][5] = {
         {  0  ,  0  ,  1  ,  0  ,  0  },
         {  0  ,  1  ,  0  ,  0  ,  0  },
@@ -509,14 +522,14 @@ void seta_esquerda() {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  }
     };
-
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers
+    npWrite();                      // Escreve na matriz de LEDs
+    npClear();                      // Limpa os buffers (não necessário, mas por garantia)
 }
 
+// Função para exibir o símbolo de seta para a direita na matriz de LEDs para a calibração
 void seta_direita() {
-    // Vetor que representa os LEDs azuis
+    // Matrizes que representam os LEDs vermelhos, verdes e azuis
     uint8_t vetorG[5][5] = {
         {  0  ,  0  ,  1  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  1  ,  0  },
@@ -531,14 +544,14 @@ void seta_direita() {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  }
     };
-
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers
+    npWrite();                      // Escreve na matriz de LEDs
+    npClear();                      // Limpa os buffers (não necessário, mas por garantia)
 }
 
+// Função para exibir o símbolo que representa o meio na matriz de LEDs para a calibração
 void meio() {
-    // Vetor que representa os LEDs azuis
+    // Matrizes que representam os LEDs vermelhos, verdes e azuis
     uint8_t vetorG[5][5] = {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  1  ,  1  ,  1  ,  0  },
@@ -553,10 +566,9 @@ void meio() {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  }
     };
-
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers
+    npWrite();                      // Escreve na matriz de LEDs
+    npClear();                      // Limpa os buffers (não necessário, mas por garantia)
 }
 
 // -------- Matriz - Fim --------

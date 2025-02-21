@@ -1,7 +1,11 @@
+// ---------------- Bibliotecas - Início ----------------
+
 #include <stdio.h>
 #include <string.h>
+
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
+
 #include "hardware/i2c.h"
 #include "hardware/pio.h"
 #include "hardware/adc.h"
@@ -12,6 +16,12 @@
 #include "inc/ssd1306.h"
 #include "inc/font.h"
 #include "ws2812.pio.h"
+
+// ---------------- Bibliotecas - Fim ----------------
+
+
+
+// ---------------- Definições - Início ----------------
 
 // Configuração do display
 #define I2C_PORT i2c1
@@ -31,7 +41,6 @@ npLED_t leds[LED_COUNT];
 PIO np_pio;
 uint sm;
 
-
 // Configuração do PWM
 #define WRAP_VALUE 4095
 #define DIV_VALUE 1.0
@@ -49,6 +58,12 @@ uint sm;
 // Configuração dos buzzers
 #define BUZZER_A 21
 #define BUZZER_B 10
+
+// ---------------- Definições - Fim ----------------
+
+
+
+// ---------------- Variáveis - Início ----------------
 
 // Variáveis para as interrupções
 static volatile uint32_t last_time = 0;
@@ -79,6 +94,9 @@ static volatile int x_scaled = 0, y_scaled = 0;
 static volatile uint32_t t_last_time = 0;
 static volatile uint8_t contador = 0;
 
+// ---------------- Variáveis - Fim ----------------
+
+
 
 // ---------------- Inicializações - Início ----------------
 
@@ -98,16 +116,6 @@ void init_display(ssd1306_t *ssd) {
     ssd1306_send_data(ssd);
 }
 
-void init_joystick() {
-    gpio_init(JSK_SEL);
-    gpio_set_dir(JSK_SEL, GPIO_IN);
-    gpio_pull_up(JSK_SEL);
-
-    adc_init();
-    adc_gpio_init(JSK_X);
-    adc_gpio_init(JSK_Y);
-}
-
 void init_rgb() {
     uint slice;
 
@@ -117,15 +125,6 @@ void init_rgb() {
     pwm_set_wrap(slice, WRAP_VALUE);
     pwm_set_gpio_level(RED_LED, 0);
     pwm_set_enabled(slice, true);
-}
-
-void init_buttons() {
-    gpio_init(BUTTON_A);
-    gpio_set_dir(BUTTON_A, GPIO_IN);
-    gpio_pull_up(BUTTON_A);
-    gpio_init(BUTTON_B);
-    gpio_set_dir(BUTTON_B, GPIO_IN);
-    gpio_pull_up(BUTTON_B);
 }
 
 void init_buzzers() {
@@ -144,9 +143,26 @@ void init_buzzers() {
     pwm_set_enabled(slice, true);
 }
 
-// ---------------- Inicializações - Fim ----------------
+void init_joystick() {
+    gpio_init(JSK_SEL);
+    gpio_set_dir(JSK_SEL, GPIO_IN);
+    gpio_pull_up(JSK_SEL);
 
-// ---------------- WS2812 - Início ----------------
+    adc_init();
+    adc_gpio_init(JSK_X);
+    adc_gpio_init(JSK_Y);
+}
+
+void init_buttons() {
+    gpio_init(BUTTON_A);
+    gpio_set_dir(BUTTON_A, GPIO_IN);
+    gpio_pull_up(BUTTON_A);
+    gpio_init(BUTTON_B);
+    gpio_set_dir(BUTTON_B, GPIO_IN);
+    gpio_pull_up(BUTTON_B);
+}
+
+// -------- Matriz - Início --------
 
 // Inicializa a máquina PIO para controle da matriz de LEDs.
 void npInit(uint pin)
@@ -217,202 +233,15 @@ void npDraw(uint8_t vetorR[5][5], uint8_t vetorG[5][5], uint8_t vetorB[5][5])
     }
 }
 
-void humidifier_matrix() {
-    // Vetor que representa os LEDs azuis
-    uint8_t vetorR[5][5] = {
-        {  1  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  1  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  1  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  1  }
-    };
-      uint8_t vetorG[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
-    uint8_t vetorB[5][5] = {
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  0  ,  0  ,  1  ,  1  ,  0  },
-        {  1  ,  1  ,  0  ,  1  ,  1  },
-        {  1  ,  1  ,  1  ,  0  ,  1  },
-        {  0  ,  1  ,  1  ,  1  ,  0  }
-    };
-    npDraw(vetorR,vetorG,vetorB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-}
+// -------- Matriz - Fim --------
 
-void temperature_menu() {
-    // Vetor que representa os LEDs azuis
-    uint8_t vetorR[5][5] = {
-        {  1  ,  1  ,  1  ,  1  ,  1  },
-        {  1  ,  0  ,  1  ,  0  ,  1  },
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  0  ,  1  ,  1  ,  1  ,  0  }
-    };
-      uint8_t vetorGB[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
-    npDraw(vetorR,vetorGB,vetorGB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-}
-void humidifier_menu() {
-    // Vetor que representa os LEDs azuis
-    uint8_t vetorRG[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
-      uint8_t vetorB[5][5] = {
-        {  1  ,  0  ,  0  ,  0  ,  1  },
-        {  1  ,  0  ,  0  ,  0  ,  1  },
-        {  1  ,  0  ,  0  ,  0  ,  1  },
-        {  1  ,  0  ,  0  ,  0  ,  1  },
-        {  1  ,  1  ,  1  ,  1  ,  1  }
-    };
+// ---------------- Inicializações - Fim ----------------
 
-    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-}
-void calibration_menu() {
-    // Vetor que representa os LEDs azuis
-    uint8_t vetorB[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
-      uint8_t vetorRG[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  1  ,  1  ,  1  ,  0  },
-        {  0  ,  1  ,  0  ,  1  ,  0  },
-        {  0  ,  1  ,  1  ,  1  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
 
-    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-}
-void seta_cima() {
-    // Vetor que representa os LEDs azuis
-    uint8_t vetorG[5][5] = {
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  0  ,  1  ,  1  ,  1  ,  0  },
-        {  1  ,  0  ,  1  ,  0  ,  1  },
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  0  ,  0  ,  1  ,  0  ,  0  }
-    };
-      uint8_t vetorRB[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
 
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-}
-void seta_baixo() {
-    // Vetor que representa os LEDs azuis
-    uint8_t vetorG[5][5] = {
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  1  ,  0  ,  1  ,  0  ,  1  },
-        {  0  ,  1  ,  1  ,  1  ,  0  },
-        {  0  ,  0  ,  1  ,  0  ,  0  }
-    };
-      uint8_t vetorRB[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
+// ---------------- Desenhos - Início ----------------
 
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-}
-void seta_esquerda() {
-    // Vetor que representa os LEDs azuis
-    uint8_t vetorG[5][5] = {
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  0  ,  1  ,  0  ,  0  ,  0  },
-        {  1  ,  1  ,  1  ,  1  ,  1  },
-        {  0  ,  1  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  1  ,  0  ,  0  }
-    };
-      uint8_t vetorRB[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
-
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-}
-void seta_direita() {
-    // Vetor que representa os LEDs azuis
-    uint8_t vetorG[5][5] = {
-        {  0  ,  0  ,  1  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  1  ,  0  },
-        {  1  ,  1  ,  1  ,  1  ,  1  },
-        {  0  ,  0  ,  0  ,  1  ,  0  },
-        {  0  ,  0  ,  1  ,  0  ,  0  }
-    };
-      uint8_t vetorRB[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
-
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-}
-void meio() {
-    // Vetor que representa os LEDs azuis
-    uint8_t vetorG[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  1  ,  1  ,  1  ,  0  },
-        {  0  ,  1  ,  0  ,  1  ,  0  },
-        {  0  ,  1  ,  1  ,  1  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
-      uint8_t vetorRB[5][5] = {
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  },
-        {  0  ,  0  ,  0  ,  0  ,  0  }
-    };
-
-    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
-    npWrite();                    // Escreve na matriz de LEDs.
-    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-}
-// ---------------- WS2812 - Fim ----------------
+// -------- Display - Início --------
 
 // Desenhos das caras no display
 void draw_happy(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
@@ -450,6 +279,7 @@ void draw_happy(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
         }
     }
 }
+
 void draw_neutral(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
     uint8_t max_y = y0+22;
     uint8_t max_x = x0+22;
@@ -485,6 +315,7 @@ void draw_neutral(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
         }
     }
 }
+
 void draw_sad(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
     uint8_t max_y = y0+22;
     uint8_t max_x = x0+22;
@@ -521,32 +352,236 @@ void draw_sad(ssd1306_t *ssd,uint8_t x0,uint8_t y0) {
     }
 }
 
+// -------- Display - Fim --------
+
+// -------- Matriz - Início --------
+
+void humidifier_matrix() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorR[5][5] = {
+        {  1  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  1  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  1  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  1  }
+    };
+      uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+    uint8_t vetorB[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  1  ,  0  },
+        {  1  ,  1  ,  0  ,  1  ,  1  },
+        {  1  ,  1  ,  1  ,  0  ,  1  },
+        {  0  ,  1  ,  1  ,  1  ,  0  }
+    };
+    npDraw(vetorR,vetorG,vetorB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+
+void temperature_screen() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorR[5][5] = {
+        {  1  ,  1  ,  1  ,  1  ,  1  },
+        {  1  ,  0  ,  1  ,  0  ,  1  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  }
+    };
+      uint8_t vetorGB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+    npDraw(vetorR,vetorGB,vetorGB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+
+void humidifier_screen() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorRG[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+      uint8_t vetorB[5][5] = {
+        {  1  ,  0  ,  0  ,  0  ,  1  },
+        {  1  ,  0  ,  0  ,  0  ,  1  },
+        {  1  ,  0  ,  0  ,  0  ,  1  },
+        {  1  ,  0  ,  0  ,  0  ,  1  },
+        {  1  ,  1  ,  1  ,  1  ,  1  }
+    };
+
+    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+
+void calibration_screen() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+      uint8_t vetorRG[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  1  ,  0  ,  1  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+
+void seta_cima() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  1  ,  0  ,  1  ,  0  ,  1  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+
+void seta_baixo() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  1  ,  0  ,  1  ,  0  ,  1  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+
+void seta_esquerda() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  1  ,  0  ,  0  ,  0  },
+        {  1  ,  1  ,  1  ,  1  ,  1  },
+        {  0  ,  1  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+
+void seta_direita() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  1  ,  0  },
+        {  1  ,  1  ,  1  ,  1  ,  1  },
+        {  0  ,  0  ,  0  ,  1  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+
+void meio() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  1  ,  0  ,  1  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+
+// -------- Matriz - Fim --------
+
+// ---------------- Desenhos - Fim ----------------
+
+
+
+// ---------------- Funções - Início ----------------
+
+// -------- Joystick - Início --------
+
 // Leitura do joystick
 uint16_t read_y() {
     adc_select_input(0);
     return adc_read();
 }
+
 uint16_t read_x() {
     adc_select_input(1);
     return adc_read();
 }
+
 int scale(int min1, int max1, int min2, int max2,int x1) {
     return ( (((x1-min1)*(max2-min2))/(max1-min1))+min2 );
-}
-
-void beep(uint tempo) {
-    pwm_set_gpio_level(BUZZER_A, 1911);
-    sleep_ms(tempo/4);
-    pwm_set_gpio_level(BUZZER_A, 0);
-    pwm_set_gpio_level(BUZZER_B, 1012);
-    sleep_ms(tempo/4);
-    pwm_set_gpio_level(BUZZER_B, 0);
-    pwm_set_gpio_level(BUZZER_A, 1911);
-    sleep_ms(tempo/4);
-    pwm_set_gpio_level(BUZZER_A, 0);
-    pwm_set_gpio_level(BUZZER_B, 1012);
-    sleep_ms(tempo/4);
-    pwm_set_gpio_level(BUZZER_B, 0);
 }
 
 void calibrate_jsk_y_values() {
@@ -665,6 +700,29 @@ void calibrate_jsk_x_values() {
     x_middle_low = value;
 }
 
+// -------- Joystick - Fim --------
+
+// -------- Buzzers - Início --------
+
+void beep(uint tempo) {
+    pwm_set_gpio_level(BUZZER_A, 1911);
+    sleep_ms(tempo/4);
+    pwm_set_gpio_level(BUZZER_A, 0);
+    pwm_set_gpio_level(BUZZER_B, 1012);
+    sleep_ms(tempo/4);
+    pwm_set_gpio_level(BUZZER_B, 0);
+    pwm_set_gpio_level(BUZZER_A, 1911);
+    sleep_ms(tempo/4);
+    pwm_set_gpio_level(BUZZER_A, 0);
+    pwm_set_gpio_level(BUZZER_B, 1012);
+    sleep_ms(tempo/4);
+    pwm_set_gpio_level(BUZZER_B, 0);
+}
+
+// -------- Buzzers - Fim --------
+
+// -------- Callback - Início --------
+
 void gpio_irq_callback(uint gpio, uint32_t events) {
     uint32_t current_time = to_ms_since_boot(get_absolute_time());
 
@@ -686,6 +744,10 @@ void gpio_irq_callback(uint gpio, uint32_t events) {
         }
     }
 }
+
+// -------- Callback - Fim --------
+
+// -------- Seleção de telas - Início --------
 
 void tela_inicial(ssd1306_t *ssd) {
     y_value = read_y();
@@ -860,10 +922,18 @@ void calibrar_joystick() {
             calibrate_jsk_y_values();
             calibrate_jsk_x_values();
             beep(120);
-            calibration_menu();
+            calibration_screen();
         }
     }
 }
+
+// -------- Seleção de telas - Fim --------
+
+// ---------------- Funções - Fim ----------------
+
+
+
+// ---------------- Main - Início ----------------
 
 int main() {
     ssd1306_t ssd;
@@ -922,15 +992,17 @@ int main() {
                     npWrite();
                     break;
                 case 1:
-                    temperature_menu();
+                    temperature_screen();
                     break;
                 case 2:
-                    humidifier_menu();
+                    humidifier_screen();
                     break;
                 case 3:
-                    calibration_menu();
+                    calibration_screen();
                     break;
             }
         }
     }
 }
+
+// ---------------- Main - Fim ----------------

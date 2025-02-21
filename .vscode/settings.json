@@ -39,6 +39,7 @@
     "files.associations": {
         "blink.pio.h": "c",
         "clocks.h": "c",
-        "cyw43_arch.h": "c"
+        "cyw43_arch.h": "c",
+        "ws2812.pio.h": "c"
     }
 }

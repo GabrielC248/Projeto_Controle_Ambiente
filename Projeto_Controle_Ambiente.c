@@ -63,16 +63,22 @@ static volatile char string3[] = "fan:medium\0";
 static volatile char string4[] = "humidifier:off\0";
 
 // Variáveis de controle do display
-static volatile int fan_low = 26, fan_medium = 30,fan_high = 32;
+static volatile int fan_low = 26, fan_medium = 30,fan_high = 34;
 static volatile int humidifier_on = 60;
 static volatile bool face_humidifier = false;
 static volatile bool face_fan = false;
+static volatile bool change_screen = false;
 
 // Variáveis para o joystick
 static volatile uint16_t x_high=4095, x_low=0, x_middle_high=2047, x_middle_low=2047;
 static volatile uint16_t y_high=4095, y_low=0, y_middle_high=2047, y_middle_low=2047;
 static volatile uint16_t x_value=2047, y_value=2047;
 static volatile int x_scaled = 0, y_scaled = 0;
+
+// Variáveis para a seleção de temperatura
+static volatile uint32_t t_last_time = 0;
+static volatile uint8_t contador = 0;
+
 
 // ---------------- Inicializações - Início ----------------
 
@@ -237,8 +243,70 @@ void humidifier_matrix() {
     npDraw(vetorR,vetorG,vetorB); // Carrega os buffers.
     npWrite();                    // Escreve na matriz de LEDs.
     npClear();                    // Limpa os buffers (não necessário, mas por garantia).
-  }
+}
 
+void temperature_menu() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorR[5][5] = {
+        {  1  ,  1  ,  1  ,  1  ,  1  },
+        {  1  ,  0  ,  1  ,  0  ,  1  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  }
+    };
+      uint8_t vetorGB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+    npDraw(vetorR,vetorGB,vetorGB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+void humidifier_menu() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorRG[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+      uint8_t vetorB[5][5] = {
+        {  1  ,  0  ,  0  ,  0  ,  1  },
+        {  1  ,  0  ,  0  ,  0  ,  1  },
+        {  1  ,  0  ,  0  ,  0  ,  1  },
+        {  1  ,  0  ,  0  ,  0  ,  1  },
+        {  1  ,  1  ,  1  ,  1  ,  1  }
+    };
+
+    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+void calibration_menu() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+      uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  1  ,  0  ,  1  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
 // ---------------- WS2812 - Fim ----------------
 
 // Desenhos das caras no display
@@ -381,6 +449,17 @@ void gpio_irq_callback(uint gpio, uint32_t events) {
 
     if( (current_time - last_time) > 200 ) {
         last_time = current_time;
+        if(gpio == JSK_SEL) {
+            if(screen_state < 4) {
+                screen_state++;
+            }else {
+                screen_state = 0;
+            }
+            change_screen = true;
+        }else
+        if(gpio == BUTTON_A) {
+
+        }else
         if(gpio == BUTTON_B) {
             flag_b = true;
         }
@@ -460,16 +539,105 @@ void tela_inicial(ssd1306_t *ssd) {
     ssd1306_send_data(ssd);
 }
 
-void selecionar_temperatura() {
+void selecionar_temperatura(ssd1306_t *ssd) {
+    uint32_t t_current_time = to_ms_since_boot(get_absolute_time());
+
+    y_value = read_y();
+
+    y_scaled = scale(y_low,y_high,-15,50,y_value);
+    if(y_scaled > 50) {
+        y_scaled = 50;
+    }else
+    if(y_scaled < -15) {
+        y_scaled = -15;
+    }
     
+    sprintf((char *)&string1[2],"%3dC*\0",y_scaled);
+
+    ssd1306_draw_string(ssd,(char *)string1,6,7);
+
+    switch(contador) {
+        case 0:
+            sprintf((char *)&string3[4],"low   \0");
+            break;
+        case 1:
+            sprintf((char *)&string3[4],"medium\0");
+            break;
+        case 2:
+            sprintf((char *)&string3[4],"high  \0");
+            break;
+        default:
+            contador = 0;
+    }
+    ssd1306_draw_string(ssd,(char *)string3,6,37);
+    
+    ssd1306_send_data(ssd);
+
+    if( (t_current_time - t_last_time) > 200 ) {
+        if(!gpio_get(BUTTON_A)) {
+            t_last_time = t_current_time;
+            switch(contador) {
+                case 0:
+                    fan_low = y_scaled;
+                    contador++;
+                    beep(120);
+                    break;
+                case 1:
+                    fan_medium = y_scaled;
+                    contador++;
+                    beep(120);
+                    break;
+                case 2:
+                    fan_high = y_scaled;
+                    contador++;
+                    beep(120);
+                    break;
+                default:
+                    contador = 0;
+            }
+        }
+    }
 }
 
-void selecionar_umidade() {
+void selecionar_umidade(ssd1306_t *ssd) {
+    uint32_t t_current_time = to_ms_since_boot(get_absolute_time());
+
+    x_value = read_x();
+
+    x_scaled = scale(x_low,x_high,0,100,x_value);
+    if(x_scaled > 100) {
+        x_scaled = 100;
+    }else
+    if(x_scaled < 0) {
+        x_scaled = 0;
+    }
     
+    sprintf((char *)&string2[2],"%3d%%\0",x_scaled);
+
+    ssd1306_draw_string(ssd,(char *)string2,6,20);
+
+    sprintf((char *)&string4[12],"n \0");
+    ssd1306_draw_string(ssd,(char *)string4,6,50);
+    
+    ssd1306_send_data(ssd);
+
+    if( (t_current_time - t_last_time) > 200 ) {
+        if(!gpio_get(BUTTON_A)) {
+            t_last_time = t_current_time;
+            humidifier_on = x_scaled;
+            beep(120);
+        }
+    }
 }
 
 void calibrar_joystick() {
-    
+    uint32_t t_current_time = to_ms_since_boot(get_absolute_time());
+    if( (t_current_time - t_last_time) > 200 ) {
+        if(!gpio_get(BUTTON_A)) {
+            t_last_time = t_current_time;
+            beep(120);
+        }
+    }
 }
 
 int main() {
@@ -486,10 +654,7 @@ int main() {
     init_buttons();
     init_buzzers();
 
-
-    PIO pio = pio0;
-    uint offset = pio_add_program(pio, &ws2812_program);
-
+    gpio_set_irq_enabled_with_callback(JSK_SEL, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_callback);
     gpio_set_irq_enabled_with_callback(BUTTON_B, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_callback);
 
     while (true) {
@@ -499,10 +664,10 @@ int main() {
                 tela_inicial(&ssd);
                 break;
             case 1:
-                selecionar_temperatura();
+                selecionar_temperatura(&ssd);
                 break;
             case 2:
-                selecionar_umidade();
+                selecionar_umidade(&ssd);
                 break;
             case 3:
                 calibrar_joystick();
@@ -521,6 +686,25 @@ int main() {
                 npClear();
                 npWrite();
                 switch_b = true;
+            }
+        }
+
+        if(change_screen) {
+            change_screen = false;
+            switch(screen_state) {
+                case 0:
+                    npClear();
+                    npWrite();
+                    break;
+                case 1:
+                    temperature_menu();
+                    break;
+                case 2:
+                    humidifier_menu();
+                    break;
+                case 3:
+                    calibration_menu();
+                    break;
             }
         }
     }

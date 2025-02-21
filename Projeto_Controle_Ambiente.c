@@ -288,18 +288,123 @@ void humidifier_menu() {
 }
 void calibration_menu() {
     // Vetor que representa os LEDs azuis
-    uint8_t vetorRB[5][5] = {
+    uint8_t vetorB[5][5] = {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  }
     };
-      uint8_t vetorG[5][5] = {
+      uint8_t vetorRG[5][5] = {
         {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  1  ,  1  ,  1  ,  0  },
         {  0  ,  1  ,  0  ,  1  ,  0  },
         {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRG,vetorRG,vetorB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+void seta_cima() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  1  ,  0  ,  1  ,  0  ,  1  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+void seta_baixo() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  1  ,  0  ,  1  ,  0  ,  1  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+void seta_esquerda() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  1  ,  0  ,  0  ,  0  },
+        {  1  ,  1  ,  1  ,  1  ,  1  },
+        {  0  ,  1  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+void seta_direita() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  1  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  1  ,  0  },
+        {  1  ,  1  ,  1  ,  1  ,  1  },
+        {  0  ,  0  ,  0  ,  1  ,  0  },
+        {  0  ,  0  ,  1  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+
+    npDraw(vetorRB,vetorG,vetorRB); // Carrega os buffers.
+    npWrite();                    // Escreve na matriz de LEDs.
+    npClear();                    // Limpa os buffers (não necessário, mas por garantia).
+}
+void meio() {
+    // Vetor que representa os LEDs azuis
+    uint8_t vetorG[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  1  ,  0  ,  1  ,  0  },
+        {  0  ,  1  ,  1  ,  1  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  }
+    };
+      uint8_t vetorRB[5][5] = {
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
+        {  0  ,  0  ,  0  ,  0  ,  0  },
         {  0  ,  0  ,  0  ,  0  ,  0  }
     };
 
@@ -442,6 +547,122 @@ void beep(uint tempo) {
     pwm_set_gpio_level(BUZZER_B, 1012);
     sleep_ms(tempo/4);
     pwm_set_gpio_level(BUZZER_B, 0);
+}
+
+void calibrate_jsk_y_values() {
+    uint16_t value, temp;
+    int i;
+    adc_select_input(0);
+
+    seta_cima();
+    sleep_ms(2000);
+
+    value = 4095;
+    for(i=0;i<500;i++) {
+        temp = adc_read();
+        if(temp < value) {
+            value = temp;
+        }
+        sleep_ms(10);
+    }
+    y_high = value;
+
+    meio();
+    sleep_ms(2000);
+
+    value = 0;
+    for(i=0;i<500;i++) {
+        temp = adc_read();
+        if(temp > value) {
+            value = temp;
+        }
+        sleep_ms(10);
+    }
+    y_middle_high = value;
+
+    seta_baixo();
+    sleep_ms(2000);
+
+    value = 0;
+    for(i=0;i<500;i++) {
+        temp = adc_read();
+        if(temp > value) {
+            value = temp;
+        }
+        sleep_ms(10);
+    }
+    y_low = value;
+
+    meio();
+    sleep_ms(2000);
+
+    value = 4095;
+    for(i=0;i<500;i++) {
+        temp = adc_read();
+        if(temp < value) {
+            value = temp;
+        }
+        sleep_ms(10);
+    }
+    y_middle_low = value;
+}
+
+void calibrate_jsk_x_values() {
+    uint16_t value, temp;
+    int i;
+    adc_select_input(1);
+
+    seta_direita();
+    sleep_ms(2000);
+
+    value = 4095;
+    for(i=0;i<500;i++) {
+        temp = adc_read();
+        if(temp < value) {
+            value = temp;
+        }
+        sleep_ms(10);
+    }
+    x_high = value;
+
+    meio();
+    sleep_ms(2000);
+
+    value = 0;
+    for(i=0;i<500;i++) {
+        temp = adc_read();
+        if(temp > value) {
+            value = temp;
+        }
+        sleep_ms(10);
+    }
+    x_middle_high = value;
+
+    seta_esquerda();
+    sleep_ms(2000);
+
+    value = 0;
+    for(i=0;i<500;i++) {
+        temp = adc_read();
+        if(temp > value) {
+            value = temp;
+        }
+        sleep_ms(10);
+    }
+    x_low = value;
+
+    meio();
+    sleep_ms(2000);
+
+    value = 4095;
+    for(i=0;i<500;i++) {
+        temp = adc_read();
+        if(temp < value) {
+            value = temp;
+        }
+        sleep_ms(10);
+    }
+    x_middle_low = value;
 }
 
 void gpio_irq_callback(uint gpio, uint32_t events) {
@@ -636,6 +857,10 @@ void calibrar_joystick() {
         if(!gpio_get(BUTTON_A)) {
             t_last_time = t_current_time;
             beep(120);
+            calibrate_jsk_y_values();
+            calibrate_jsk_x_values();
+            beep(120);
+            calibration_menu();
         }
     }
 }

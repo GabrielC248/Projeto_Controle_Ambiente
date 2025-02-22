@@ -800,12 +800,18 @@ void gpio_irq_callback(uint gpio, uint32_t events) {
 
 // -------- Seleção de telas - Início --------
 
+// Função que representa a tela inicial, atualizando os valores de temperatura e umidade, estado do ventilador, do umidificador e do rostinho
 void tela_inicial(ssd1306_t *ssd) {
+
+    // Lê os valores analógicos do joystick
     y_value = read_y();
     x_value = read_x();
 
+    // Escala os valores do joystick para representar temperatura e umidade
     y_scaled = scale(y_low,y_high,-15,50,y_value);
     x_scaled = scale(x_low,x_high,0,100,x_value);
+
+    // Limita os valores escalados dentro dos intervalos desejados
     if(y_scaled > 50) {
         y_scaled = 50;
     }else
@@ -819,68 +825,82 @@ void tela_inicial(ssd1306_t *ssd) {
         x_scaled = 0;
     }
 
-    sprintf((char *)&string1[2],"%3dC*\0",y_scaled);
-    sprintf((char *)&string2[2],"%3d%%\0",x_scaled);
+    // Atualiza as strings de temperatura e umidade com os valores lidos
+    sprintf((char *)&string1[2],"%3dC*\0",y_scaled); // Atualiza o final da string1 (temperatura) "000C°" com o valor convertido do eixo Y
+    sprintf((char *)&string2[2],"%3d%%\0",x_scaled); // Atualiza o final da string2 (umidade) "000%" com o valor convertido do eixo X
 
-    if(y_scaled < fan_low) {
-        sprintf((char *)&string3[4],"off   \0");
-        pwm_set_gpio_level(RED_LED, 0);
-        face_fan = true;
+    // Determina o estado do ventilador com base na temperatura
+    if(y_scaled < fan_low) { // Ventilador desligado
+        sprintf((char *)&string3[4],"off   \0"); // Atualiza a string3 (estado do ventilador) para mostrar "off   "
+        pwm_set_gpio_level(RED_LED, 0);          // Define o LED vermelho como desligado para representar o "off"
+        face_fan = true;                         // Flag para definir se o estado do rostinho
     }else
-    if(y_scaled < fan_medium) {
-        sprintf((char *)&string3[4],"low   \0");
-        pwm_set_gpio_level(RED_LED, 1365);
-        face_fan = true;
+    if(y_scaled < fan_medium) { // Velocidade baixa
+        sprintf((char *)&string3[4],"low   \0"); // Atualiza a string3 (estado do ventilador) para mostrar "low   "
+        pwm_set_gpio_level(RED_LED, 1365);       // Define o LED vermelho com uma luz baixa (1/3 do wrap) para representar o "low"
+        face_fan = true;                         // Flag para definir se o estado do rostinho
     }else
-    if(y_scaled < fan_high) {
-        sprintf((char *)&string3[4],"medium\0");
-        pwm_set_gpio_level(RED_LED, 2730);
-        face_fan = true;
-    }else {
-        sprintf((char *)&string3[4],"high  \0");
-        pwm_set_gpio_level(RED_LED, 4095);
-        face_fan = false;
+    if(y_scaled < fan_high) { // Velocidade média
+        sprintf((char *)&string3[4],"medium\0"); // Atualiza a string3 (estado do ventilador) para mostrar "medium"
+        pwm_set_gpio_level(RED_LED, 2730);       // Define o LED vermelho com uma luz média (2/3 do wrap) para representar o "medium"
+        face_fan = true;                         // Flag para definir se o estado do rostinho
+    }else { // Velocidade alta
+        sprintf((char *)&string3[4],"high  \0"); // Atualiza a string3 (estado do ventilador) para mostrar "high  "
+        pwm_set_gpio_level(RED_LED, 4095);       // Define o LED vermelho com uma luz alta (3/3 do wrap) para representar o "high"
+        face_fan = false;                        // Flag para definir se o estado do rostinho
     }
 
-    if(x_scaled > humidifier_on) {
-        sprintf((char *)&string4[11],"off\0");
-        face_humidifier = true;
-        pwm_set_gpio_level(BLUE_LED, 0);
-    }else {
-        sprintf((char *)&string4[11],"on \0");
-        face_humidifier = false;
-        pwm_set_gpio_level(BLUE_LED, 1365);
+    // Determina o estado do umidificador com base na umidade (eixo X)
+    if(x_scaled > humidifier_on) { // Umidificador desligado
+        sprintf((char *)&string4[11],"off\0"); // Atualiza a string4 (estado do umidificador) para mostrar "off"
+        face_humidifier = true;                // Flag para definir se o estado do rostinho
+        pwm_set_gpio_level(BLUE_LED, 0);       // Desliga o LED azul para representar o umidificador desligado
+    }else { // Umidificador ligado
+        sprintf((char *)&string4[11],"on \0"); // Atualiza a string4 (estado do umidificador) para mostrar "on "
+        face_humidifier = false;               // Flag para definir se o estado do rostinho
+        pwm_set_gpio_level(BLUE_LED, 1365);    // Liga o LED azul para representar o umidificador ligado
     }
 
+    // Define a expressão do rostinho com base no estado do ventilador e do umidificador
     if(face_fan && face_humidifier) {
-        draw_happy(ssd,84,6);
+        draw_happy(ssd,84,6);   // Feliz se ambos estiverem desligados
     }else
     if(!face_fan && !face_humidifier) {
-        draw_sad(ssd,84,6);
+        draw_sad(ssd,84,6);     // Triste se ambos estiverem ligados (Muito quente e seco)
     }else {
-        draw_neutral(ssd,84,6);
+        draw_neutral(ssd,84,6); // Neutro caso um ligado e outro desligado (Muito quente ou seco)
     }
 
-    ssd1306_rect(ssd, 0, 0, 128, 64, true, false);
-    ssd1306_rect(ssd, 2, 2, 124, 60, true, false);
-    ssd1306_vline(ssd,63,3,30,true);
-    ssd1306_vline(ssd,64,3,30,true);
-    ssd1306_hline(ssd,3,124,31,true);
-    ssd1306_hline(ssd,3,124,32,true);
-    ssd1306_draw_string(ssd,(char *)string1,6,7);
-    ssd1306_draw_string(ssd,(char *)string2,6,20);
-    ssd1306_draw_string(ssd,(char *)string3,6,37);
-    ssd1306_draw_string(ssd,(char *)string4,6,50);
+    // Manda para o buffer do display os elementos que devem ser desenhados
+    ssd1306_rect(ssd, 0, 0, 128, 64, true, false); // Borda externa
+    ssd1306_rect(ssd, 2, 2, 124, 60, true, false); // Borda interna
+    ssd1306_vline(ssd,63,3,30,true); // divisória dupla vertical (meio esquerda x = 63)
+    ssd1306_vline(ssd,64,3,30,true); // divisória dupla vertical (meio direta x = 64)
+    ssd1306_hline(ssd,3,124,31,true); // divisória dupla horizontal (meio cima y = 31)
+    ssd1306_hline(ssd,3,124,32,true); // divisória dupla horizontal (meio baixo y = 32)
 
+    // Manda para o buffer do display as strings que devem ser desenhadas
+    ssd1306_draw_string(ssd,(char *)string1,6,7);  // string da temperatura (string1)
+    ssd1306_draw_string(ssd,(char *)string2,6,20); // string da umidade (string2)
+    ssd1306_draw_string(ssd,(char *)string3,6,37); // string do estado do ventilador (string3)
+    ssd1306_draw_string(ssd,(char *)string4,6,50); // string do estado do umidificador (string4)
+
+    // Envia os dados do buffer para atualizar o display
     ssd1306_send_data(ssd);
 }
 
+// Função que representa a tela de seleção das temperaturas limites
 void selecionar_temperatura(ssd1306_t *ssd) {
+    // Obtém o tempo atual em milissegundos para debouncing
     uint32_t t_current_time = to_ms_since_boot(get_absolute_time());
 
+    // Lê o valor analógico do joystick no eixo Y
     y_value = read_y();
 
+    // Escala o valor lido para representar a temperatura simulada
     y_scaled = scale(y_low,y_high,-15,50,y_value);
+
+    // Garante que a temperatura fique dentro dos limites definidos
     if(y_scaled > 50) {
         y_scaled = 50;
     }else
@@ -888,71 +908,87 @@ void selecionar_temperatura(ssd1306_t *ssd) {
         y_scaled = -15;
     }
 
-    sprintf((char *)&string2[2],"    \0");
-    sprintf((char *)&string4[11],"   \0");
-    ssd1306_draw_string(ssd,(char *)string2,6,20);
-    ssd1306_draw_string(ssd,(char *)string4,6,50);
+    // Limpa os campos de umidade do buffer do display
+    sprintf((char *)&string2[2],"    \0");         // Atualiza o final da string2 (umidade) com "    \0"
+    sprintf((char *)&string4[11],"   \0");         // Atualiza o final da string4 (estado do umidificador) com "    \0"
+    ssd1306_draw_string(ssd,(char *)string2,6,20); // Atualiza o buffer do display da string2 (umidade)
+    ssd1306_draw_string(ssd,(char *)string4,6,50); // Atualiza o buffer do display da string4 (estado do umidificador)
+
+    // Desliga o LED azul, pois só o ventilador está sendo configurado
     pwm_set_gpio_level(BLUE_LED, 0);
 
-    sprintf((char *)&string1[2],"%3dC*\0",y_scaled);
+    
+    sprintf((char *)&string1[2],"%3dC*\0",y_scaled); // Atualiza o final da string1 (temperatura) "000C°" com o valor convertido do eixo Y
+    ssd1306_draw_string(ssd,(char *)string1,6,7);    // Manda para o buffer do display o valor lido de temperatura
 
-    ssd1306_draw_string(ssd,(char *)string1,6,7);
-
+    // Define a velocidade do ventilador e a expressão facial para corresponder ao limite de temperatura que está sendo configurado
     switch(contador) {
-        case 0:
+        case 0: // Configuração da temperatura para velocidade baixa
             pwm_set_gpio_level(RED_LED, 1365);
             sprintf((char *)&string3[4],"low   \0");
             draw_happy(ssd,84,6);
             break;
-        case 1:
+        case 1: // Configuração da temperatura para velocidade média
             pwm_set_gpio_level(RED_LED, 2730);
             sprintf((char *)&string3[4],"medium\0");
             draw_happy(ssd,84,6);
             break;
-        case 2:
+        case 2: // Configuração da temperatura para velocidade alta
             pwm_set_gpio_level(RED_LED, 4095);
             sprintf((char *)&string3[4],"high  \0");
             draw_sad(ssd,84,6);
             break;
         default:
-            contador = 0;
+            contador = 0; // Reinicia o contador em caso de bug
     }
+
+    // Manda para o buffer do display a string3 (estado do ventilador)
     ssd1306_draw_string(ssd,(char *)string3,6,37);
     
+    // Envia os dados do buffer para atualizar o display
     ssd1306_send_data(ssd);
 
+    // Verifica se o botão A foi pressionado
     if( (t_current_time - t_last_time) > 200 ) {
         if(!gpio_get(BUTTON_A)) {
             t_last_time = t_current_time;
+
+             // Armazena a temperatura definida para cada nível do ventilador
             switch(contador) {
                 case 0:
-                    fan_low = y_scaled;
+                    fan_low = y_scaled; // Define a temperatura para o nível baixo
                     contador++;
-                    beep(120);
+                    beep(120);          // Emite um som de confirmação
                     break;
                 case 1:
-                    fan_medium = y_scaled;
+                    fan_medium = y_scaled; // Define a temperatura para o nível médio
                     contador++;
                     beep(120);
                     break;
                 case 2:
-                    fan_high = y_scaled;
-                    contador++;
+                    fan_high = y_scaled; // Define a temperatura para o nível alto
+                    contador = 0;
                     beep(120);
                     break;
                 default:
-                    contador = 0;
+                    contador = 0; // Reinicia o contador em caso de bug
             }
         }
     }
 }
 
+// Função que representa a tela de seleção da umidade limite
 void selecionar_umidade(ssd1306_t *ssd) {
+    // Obtém o tempo atual em milissegundos para debouncing
     uint32_t t_current_time = to_ms_since_boot(get_absolute_time());
 
+    // Lê o valor analógico do joystick no eixo X
     x_value = read_x();
 
+    // Escala o valor lido para representar a umidade simulada
     x_scaled = scale(x_low,x_high,0,100,x_value);
+
+    // Garante que a umidade fique dentro dos limites definidos
     if(x_scaled > 100) {
         x_scaled = 100;
     }else
@@ -960,42 +996,58 @@ void selecionar_umidade(ssd1306_t *ssd) {
         x_scaled = 0;
     }
     
-    sprintf((char *)&string1[2],"     \0");
-    sprintf((char *)&string3[4],"      \0");
-    ssd1306_draw_string(ssd,(char *)string1,6,7);
-    ssd1306_draw_string(ssd,(char *)string3,6,37);
+    // Limpa os campos de temperatura do buffer do display
+    sprintf((char *)&string1[2],"     \0");        // Atualiza o final da string1 (temperatura) com "     \0"
+    sprintf((char *)&string3[4],"      \0");       // Atualiza o final da string3 (estado do ventilador) com "      \0"
+    ssd1306_draw_string(ssd,(char *)string1,6,7);  // Atualiza o buffer do display da string1 (temperatura)
+    ssd1306_draw_string(ssd,(char *)string3,6,37); // Atualiza o buffer do display da string3 (estado do ventilador)
+
+    // Desliga o LED vermelho, pois só o umidificador está sendo configurado
     pwm_set_gpio_level(RED_LED, 0);
     
-    sprintf((char *)&string2[2],"%3d%%\0",x_scaled);
-    ssd1306_draw_string(ssd,(char *)string2,6,20);
+    sprintf((char *)&string2[2],"%3d%%\0",x_scaled); // Atualiza o final da string2 (umidade) "000%" com o valor convertido do eixo X
+    ssd1306_draw_string(ssd,(char *)string2,6,20);   // Manda para o buffer do display o valor lido de umidade
 
-    pwm_set_gpio_level(BLUE_LED, 1365);
-    sprintf((char *)&string4[11],"on \0");
-    draw_sad(ssd,84,6);
-    ssd1306_draw_string(ssd,(char *)string4,6,50);
+    // Define as informações do umidificador como ligado para mostrar que é o limite de acionamento que está sendo configurado
+    pwm_set_gpio_level(BLUE_LED, 1365);            // Liga o LED azul
+    sprintf((char *)&string4[11],"on \0");         // Atualiza o final da string4 (estado do umidificador) com "on \0"
+    draw_sad(ssd,84,6);                            // Desenha o rostinho triste
+    ssd1306_draw_string(ssd,(char *)string4,6,50); // Atualiza o buffer do display da string4 (estado do umidificador)
     
+    // Envia os dados do buffer para atualizar o display
     ssd1306_send_data(ssd);
 
+    // Verifica se o botão A foi pressionado
     if( (t_current_time - t_last_time) > 200 ) {
         if(!gpio_get(BUTTON_A)) {
-            t_last_time = t_current_time;
-            humidifier_on = x_scaled;
-            beep(120);
+            t_last_time = t_current_time; 
+            humidifier_on = x_scaled; // Define a umidade de acionamento do umidificador com o valor lido do eixo X
+            beep(120);                // Emite um som de confirmação
         }
     }
 }
 
 void calibrar_joystick() {
+    // Obtém o tempo atual em milissegundos
     uint32_t t_current_time = to_ms_since_boot(get_absolute_time());
+
+    // Verifica se o botão A foi pressionado
     if( (t_current_time - t_last_time) > 200 ) {
         if(!gpio_get(BUTTON_A)) {
             t_last_time = t_current_time;
+
+            // Desativa temporariamente a interrupção do botão do joystick para evitar bugs durante a calibração
             gpio_set_irq_enabled(JSK_SEL, GPIO_IRQ_EDGE_FALL, false);
-            beep(120);
-            calibrate_jsk_y_values();
-            calibrate_jsk_x_values();
-            beep(120);
+
+            beep(120);                // Emite um bip para indicar o início da calibração
+            calibrate_jsk_y_values(); // Executa a calibração dos valores do eixo Y do joystick
+            calibrate_jsk_x_values(); // Executa a calibração dos valores do eixo X do joystick
+            beep(120);                // Emite um bip para indicar o fim da calibração
+
+            // Volta a matriz de LEDs para o desenho inicial da tela de calibração
             calibration_screen();
+
+            // Reativa a interrupção do botão do joystick
             gpio_set_irq_enabled(JSK_SEL, GPIO_IRQ_EDGE_FALL, true);
         }
     }
@@ -1010,76 +1062,81 @@ void calibrar_joystick() {
 // ---------------- Main - Início ----------------
 
 int main() {
-    ssd1306_t ssd;
+    ssd1306_t ssd; // Váriavel que identifica o display
 
-    stdio_init_all();
-    init_display(&ssd);
-    npInit(MATRIX_PIN);
+    stdio_init_all(); // Inicializa as entradas e saídas padrões
+
+    init_display(&ssd); // Inicializa o display OLED
+
+    npInit(MATRIX_PIN); // Inicializa e limpa a matriz de LEDs
     npClear();
     npWrite();
 
-    init_joystick();
-    init_rgb();
-    init_buttons();
-    init_buzzers();
+    init_joystick(); // Inicializa o joystick
+    init_rgb();      // Inicializa o LED RGB
+    init_buttons();  // Inicializa os botões A e B
+    init_buzzers();  // Inicializa os buzzers
 
+    // Configura as interrupções para o botão do joystick e para o botão B
     gpio_set_irq_enabled_with_callback(JSK_SEL, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_callback);
     gpio_set_irq_enabled_with_callback(BUTTON_B, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_callback);
 
     while (true) {
-        sleep_ms(10);
+        sleep_ms(10); // Pequena pausa para testes no WOKWI
+
+        // Controla qual tela deve ser exibida de acordo com o estado atual
         switch(screen_state) {
             case 0:
-                tela_inicial(&ssd);
+                tela_inicial(&ssd); // Tela principal
                 break;
             case 1:
-                selecionar_temperatura(&ssd);
+                selecionar_temperatura(&ssd); // Tela para configurar as temperaturas de acionamento do ventilador
                 break;
             case 2:
-                selecionar_umidade(&ssd);
+                selecionar_umidade(&ssd); // Tela para configurar a umidade de acionamento do umidificador
                 break;
-            case 3:
-                calibrar_joystick();
+            case 3: 
+                calibrar_joystick(); // Tela para calibrar o joystick
                 break;
             default:
-                screen_state = 0;
+                screen_state = 0; // Caso haja um estado inválido (bug), retorna para a tela inicial
         }
 
+         // Tratar a interrupção do botão B (Simula o sinal que está sendo recebido pelo sensor de nível do umidificador)
         if(flag_b) {
-            flag_b = false;
-            if(switch_b) {
-                humidifier_matrix();
-                beep(400);
+            flag_b = false; // Reseta a flag
+            if(switch_b) { // Faz o botão funcionar como um interruptor (simula o sinal constante 0 ou 1)
+                humidifier_matrix(); // Mostra na matriz de LEDs que o umidificador está com pouca água
+                beep(400);           // Emite um som indicando que o umidificador está com pouca água
                 switch_b = false;
             }else {
-                npClear();
+                npClear(); // Limpa a matriz de LEDs
                 npWrite();
                 switch_b = true;
             }
         }
 
+        // Lógica para alternar a imagem da matriz de LEDs entre as mudanças de tela
         if(change_screen) {
             change_screen = false;
             switch(screen_state) {
                 case 0:
-                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, true);
-                    npClear();
+                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, true); // Permite o aviso de falta de água habilitando novamente a interrupção
+                    npClear(); // Limpa a matriz de LEDs ao voltar à tela inicial
                     npWrite();
                     break;
                 case 1:
-                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, false);
-                    temperature_screen();
+                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, false); // Desativa o aviso de falta de água já que não está na tela principal
+                    temperature_screen(); // Exibe o desenho de configuração de temperatura na matriz
                     break;
                 case 2:
-                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, false);
-                    humidifier_screen();
+                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, false); // Desativa o aviso de falta de água já que não está na tela principal
+                    humidifier_screen(); // Exibe o desenho de configuração de umidade na matriz
                     break;
                 case 3:
-                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, false);
-                    pwm_set_gpio_level(BLUE_LED, 0);
-                    pwm_set_gpio_level(RED_LED, 0);
-                    tela_inicial(&ssd);
-                    calibration_screen();
+                    gpio_set_irq_enabled(BUTTON_B, GPIO_IRQ_EDGE_FALL, false); // Desativa o aviso de falta de água já que não está na tela principal
+                    tela_inicial(&ssd); // Atualiza os dados mostrados no display 1 vez para aparecer todas as informações de novo
+                    calibration_screen(); // Exibe o desenho de configuração de umidade na matriz
                     break;
             }
         }

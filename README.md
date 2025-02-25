@@ -1,7 +1,7 @@
 # Sistema de Controle para Conforto Térmico
   - **Desenvolvedor:** <ins>Gabriel Cavalcanti Coelho</ins>;
   - **Matrícula:** TIC370101612;
-  - **Vídeo:** [YouTube](https://www.youtube.com/).
+  - **Vídeo:** [YouTube](https://youtu.be/O-hy5v507hY).
 
 ### Objetivos do projeto:
 1. Monitorar continuamente a temperatura e a umidade do ambiente; 
